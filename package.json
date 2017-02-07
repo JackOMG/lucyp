@@ -1,0 +1,25 @@
+{
+  "name": "lucypepper",
+  "version": "1.0.0",
+  "description": "This is the pepper bot",
+  "main": "app.js",
+  "dependencies": {
+    "restify": "^4.3.0",
+    "botbuilder": "^3.6.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JackOMG/lucypepper.git"
+  },
+  "author": "Jack Smies",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/JackOMG/lucypepper/issues"
+  },
+  "homepage": "https://github.com/JackOMG/lucypepper#readme"
+}
