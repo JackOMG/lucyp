@@ -6,7 +6,7 @@
   "dependencies": {
     "restify": "^4.3.0",
     "botbuilder": "^3.6.0",
-	"mongodb": "", 
+	"mongodb": "" 
   },
   "devDependencies": {},
   "scripts": {
