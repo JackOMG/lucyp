@@ -51,7 +51,7 @@ bot.endConversationAction('goodbye', 'Goodbye :)', { matches: /^goodbye/i });
 
 bot.dialog('/', [
     function (session) {
-        session.send("Hi... I'm the Crypto X Bot. I can help you buy your crypto currencies");
+        session.send("Hi... I'm the ING Quiz Bot. I can help you learn about new topics");
 		db.collection('users').insert({userId: session.message.address.user.id, 
 			userName: session.message.address.user.name, 
 			date:(new Date()).getTime(),
@@ -112,7 +112,7 @@ bot.dialog('playquiz', [
 		builder.Prompts.text(session, "Cool lets play a quiz. About what topic?");	
 	},
 	function (session, results) {
-		db.collection('quizQuestions').find({topic: results.response}).sort({asked: 1}).limit(1).toArray(function(err, row) {
+		db.collection('quizQuestions').find({topic: results.response}).collation({locale: "en", strength:2}).sort({asked: 1}).limit(1).toArray(function(err, row) {
 			if (err) console.log(err)
 			if (row[0]) {
 				session.userData.quizQuestion = row[0]
@@ -121,7 +121,15 @@ bot.dialog('playquiz', [
 				var ObjectId = require('mongodb').ObjectId;
 				db.collection('quizQuestions').update({_id:  ObjectId(session.userData.quizQuestion._id)}, {$inc: {asked: 1}});
 			} else {
-				session.endDialog("I have no quiz questions about this topic.")
+				// no questions on this topic. show most popular topics
+				db.collection('topics').find({}).sort({questions: -1}).limit(10).toArray(function(err, rows) {
+					var msg = 'I have no questions on: '+results.response+'\n\nHere are the most popular topics: '
+					for (var i in rows) {
+						msg = msg + rows[i].topic + ' ('+rows[i].questions+'), '
+					}
+					session.endDialog(msg)
+				})
+
 			}
 		})
 	},
@@ -136,10 +144,11 @@ bot.dialog('playquiz', [
 
 bot.dialog('quizContribute', [
     function (session) {
-		builder.Prompts.text(session, "What is the topic?");	
+		builder.Prompts.text(session, "What is the topic?");
+		//db.collection('topics').createIndex({topic: 1}, {collation: {locale: "en", strength: 2}})
 	},
 	function (session, results) {
-		session.userData.quizTopic = results.response
+		session.userData.quizTopic = results.response.toLowerCase()
 		builder.Prompts.text(session, "What is the quiz question? State your question as a statement that can be True or False");	
 	},
 	function (session, results) {
@@ -154,6 +163,9 @@ bot.dialog('quizContribute', [
 			asked: 0,
 			date:(new Date()).getTime()
 		})
+		// update the Topics to keep track how many questions on this topic
+		db.collection('topics').update({topic: session.userData.quizTopic}, {$inc: {questions: 1}}, { upsert: true });	
+		
 		session.endDialog("Thank you so much for your contribution")
 	}	
 ])
