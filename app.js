@@ -1,5 +1,15 @@
 const restify = require('restify');
 const builder = require('botbuilder');
+const MongoClient = require('mongodb').MongoClient;
+//const Exchanges = require('crypto-exchange')
+
+global.db=null; //database handle
+MongoClient.connect(process.env.mongoConnect||"mongodb://localhost:27017", function(err, database) {
+  if(!err) {
+    console.log("DB connected");
+	db = database;
+  } else console.log(err.stack);
+});
 
 //=========================================================
 // Bot Setup
@@ -31,7 +41,8 @@ bot.use(builder.Middleware.dialogVersion({ version: 1.0, resetCommand: /^reset/i
 //=========================================================
 
 bot.endConversationAction('goodbye', 'Goodbye :)', { matches: /^goodbye/i });
-bot.beginDialogAction('help', '/help', { matches: /^help/i });
+//bot.beginDialogAction('search','/search', { matches: /^search/i });
+//bot.beginDialogAction('account','/account','my account', { matches: /^account/i });
 
 
 //=========================================================
@@ -40,21 +51,13 @@ bot.beginDialogAction('help', '/help', { matches: /^help/i });
 
 bot.dialog('/', [
     function (session) {
-        // Send a greeting and show help.
-        var card = new builder.HeroCard(session)
-            .title("Microsoft Bot Framework")
-            .text("Your bots - wherever your users are talking.")
-            .images([
-                 builder.CardImage.create(session, "http://docs.botframework.com/images/demo_bot_image.png")
-            ]);
-        var msg = new builder.Message(session).attachments([card]);
-        session.send(msg);
-        session.send("Hi... I'm the Microsoft Bot Framework demo bot for Facebook. I can show you everything you can use our Bot Builder SDK to do on Facebook.");
-        session.beginDialog('/help');
-    },
-    function (session, results) {
-        // Display menu
-        session.beginDialog('/menu');
+        session.send("Hi... I'm the Crypto X Bot. I can help you buy your crypto currencies");
+		db.collection('users').insert({userId: session.message.address.user.id, 
+			userName: session.message.address.user.name, 
+			date:(new Date()).getTime(),
+			address: session.message.address
+		})	
+        session.beginDialog('/start');
     },
     function (session, results) {
         // Always say goodbye
@@ -62,11 +65,12 @@ bot.dialog('/', [
     }
 ]);
 
-bot.dialog('/menu', [
-    function (session) {
-        builder.Prompts.choice(session, "What demo would you like to run?", "prompts|picture|cards|list|carousel|receipt|actions|(quit)");
+bot.dialog('/start', [
+    function (session) {	
+        builder.Prompts.choice(session, "What can I do for you?", "ask|quiz|know|review");
     },
     function (session, results) {
+		console.log('results:'+results.response.entity)
         if (results.response && results.response.entity != '(quit)') {
             // Launch demo dialog
             session.beginDialog('/' + results.response.entity);
@@ -77,292 +81,394 @@ bot.dialog('/menu', [
     },
     function (session, results) {
         // The menu runs a loop until the user chooses to (quit).
-        session.replaceDialog('/menu');
+        session.replaceDialog('/start');
     }
-]).reloadAction('reloadMenu', null, { matches: /^menu|show menu/i });
+]).reloadAction('reloadMenu', null, { matches: /^start|show menu/i });
 
-bot.dialog('/help', [
+bot.dialog('/ask', [
     function (session) {
-        session.endDialog("Global commands that are available anytime:\n\n* menu - Exits a demo and returns to the menu.\n* goodbye - End this conversation.\n* help - Displays these commands.");
-    }
-]);
+		builder.Prompts.text(session, "What is your question?");
+	},
+	function (session, results) {
+		session.userData.question = results.response
+		builder.Prompts.text(session, "That is an interesting question, I dont know the answer yet but I will try to find out for you.");
+	}	
+]).triggerAction({matches: /^(A|a)sk$/});
 
-bot.dialog('/prompts', [
+bot.dialog('/quiz', [
     function (session) {
-        session.send("Our Bot Builder SDK has a rich set of built-in prompts that simplify asking the user a series of questions. This demo will walk you through using each prompt. Just follow the prompts and you can quit at any time by saying 'cancel'.");
-        builder.Prompts.text(session, "Prompts.text()\n\nEnter some text and I'll say it back.");
-    },
-    function (session, results) {
-        session.send("You entered '%s'", results.response);
-        builder.Prompts.number(session, "Prompts.number()\n\nNow enter a number.");
-    },
-    function (session, results) {
-        session.send("You entered '%s'", results.response);
-        session.send("Bot Builder includes a rich choice() prompt that lets you offer a user a list choices to pick from. On Facebook these choices by default surface using Quick Replies if there are 10 or less choices. If there are more than 10 choices a numbered list will be used but you can specify the exact type of list to show using the ListStyle property.");
-        builder.Prompts.choice(session, "Prompts.choice()\n\nChoose a list style (the default is auto.)", "auto|inline|list|button|none");
-    },
-    function (session, results) {
-        var style = builder.ListStyle[results.response.entity];
-        builder.Prompts.choice(session, "Prompts.choice()\n\nNow pick an option.", "option A|option B|option C", { listStyle: style });
-    },
-    function (session, results) {
-        session.send("You chose '%s'", results.response.entity);
-        builder.Prompts.confirm(session, "Prompts.confirm()\n\nSimple yes/no questions are possible. Answer yes or no now.");
-    },
-    function (session, results) {
-        session.send("You chose '%s'", results.response ? 'yes' : 'no');
-        builder.Prompts.time(session, "Prompts.time()\n\nThe framework can recognize a range of times expressed as natural language. Enter a time like 'Monday at 7am' and I'll show you the JSON we return.");
-    },
-    function (session, results) {
-        session.send("Recognized Entity: %s", JSON.stringify(results.response));
-        builder.Prompts.attachment(session, "Prompts.attachment()\n\nYour bot can wait on the user to upload an image or video. Send me an image and I'll send it back to you.");
-    },
-    function (session, results) {
-        var msg = new builder.Message(session)
-            .ntext("I got %d attachment.", "I got %d attachments.", results.response.length);
-        results.response.forEach(function (attachment) {
-            msg.addAttachment(attachment);    
-        });
-        session.endDialog(msg);
-    }
-]);
+		builder.Prompts.choice(session, "Would you like to play a quiz or contribute a question","play|contribute");
+	},
+	function (session, results) {
+		if (results.response.entity == 'play')
+			session.beginDialog('playquiz')
+		else
+			session.beginDialog('quizContribute')
+	}	
+]).triggerAction({matches: /^(Q|q)uiz$/});
 
-bot.dialog('/picture', [
+bot.dialog('playquiz', [
     function (session) {
-        session.send("You can easily send pictures to a user...");
-        var msg = new builder.Message(session)
-            .attachments([{
-                contentType: "image/jpeg",
-                contentUrl: "http://www.theoldrobots.com/images62/Bender-18.JPG"
-            }]);
-        session.endDialog(msg);
-    }
-]);
+		builder.Prompts.text(session, "Cool lets play a quiz. About what topic?");	
+	},
+	function (session, results) {
+		db.collection('quizQuestions').find({topic: results.response}).sort({asked: 1}).limit(1).toArray(function(err, row) {
+			if (err) console.log(err)
+			if (row[0]) {
+				session.userData.quizQuestion = row[0]
+				builder.Prompts.choice(session, row[0].quizQuestion, "True|False");
+				// update question asked counter
+				var ObjectId = require('mongodb').ObjectId;
+				db.collection('quizQuestions').update({_id:  ObjectId(session.userData.quizQuestion._id)}, {$inc: {asked: 1}});
+			} else {
+				session.endDialog("I have no quiz questions about this topic.")
+			}
+		})
+	},
+	function (session, results) {
+		if (session.userData.quizQuestion.correctAnswer == results.response.entity) {
+			session.endDialog('Your answer is correct')
+		} else {
+			session.endDialog('Unfortunatly your answer is wrong')
+		}
+	}		
+])
 
-bot.dialog('/cards', [
+bot.dialog('quizContribute', [
     function (session) {
-        session.send("You can use either a Hero or a Thumbnail card to send the user visually rich information. On Facebook both will be rendered using the same Generic Template...");
+		builder.Prompts.text(session, "What is the topic?");	
+	},
+	function (session, results) {
+		session.userData.quizTopic = results.response
+		builder.Prompts.text(session, "What is the quiz question? State your question as a statement that can be True or False");	
+	},
+	function (session, results) {
+		session.userData.quizQuestion = results.response
+		builder.Prompts.choice(session, "What is the correct answer?","True|False");	
+	},
+	function (session, results) {	
+		db.collection('quizQuestions').insert({userId: session.message.address.user.id, 
+			topic: session.userData.quizTopic,
+			quizQuestion: session.userData.quizQuestion,
+			correctAnswer: results.response.entity,
+			asked: 0,
+			date:(new Date()).getTime()
+		})
+		session.endDialog("Thank you so much for your contribution")
+	}	
+])
 
-        var msg = new builder.Message(session)
-            .attachments([
-                new builder.HeroCard(session)
-                    .title("Hero Card")
-                    .subtitle("The Space Needle is an observation tower in Seattle, Washington, a landmark of the Pacific Northwest, and an icon of Seattle.")
-                    .images([
-                        builder.CardImage.create(session, "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Seattlenighttimequeenanne.jpg/320px-Seattlenighttimequeenanne.jpg")
-                    ])
-                    .tap(builder.CardAction.openUrl(session, "https://en.wikipedia.org/wiki/Space_Needle"))
-            ]);
-        session.send(msg);
+bot.dialog('/know', [
+	function (session) {
+		builder.Prompts.choice(session, "Manage your account", "balances|open orders");
+	},
+	function (session, results) {
+		switch (results.response.entity) {
+			case 'balances':
+				db.collection('balances').find({userId: session.message.address.user.id}).toArray(function(err, balances) {
+					var msg = 'Your balances:\n\n'
+					for (var i in balances) {
+						if (balances[i].currency == 'USD')
+							msg = msg + 'USD: '+balances[i].balance.toFixed(2) +'\n\n'
+						else
+							msg = msg + balances[i].currency + ': '+balances[i].balance +'\n\n'
+					}
+					session.send(msg)
+					session.endConversation()
+					session.beginDialog('/start')
+				})
+				break;
+			case 'open orders':
+				// first list buy orders
+				db.collection('orders').find({userId: session.message.address.user.id}).toArray(function(err, orders) {
+					console.log('Orders %j', orders)
+					if (orders.length<1) {
+						// no open orders
+						session.send('You have no outstanding open orders.')
+						session.endConversation()
+						session.beginDialog('/start')
+					} else {
+						var msg = 'Your outstanding orders: \n\n'
+						for (var i = 0; i < orders.length; i++) {
+							msg = msg+'#'+(i+1)+': '+(orders[i].trade == "B" ? "Buy " : "Sell ")+orders[i].volume + ' '+orders[i].currency + ' at $'+ orders[i].price +'\n\n'
+						}
+						session.userData.openOrders = orders
+						session.send(msg)
+						session.beginDialog('cancelOrders')
+					}
+				})
+				break;
+		}
+	}
+]).triggerAction({matches: /^(a|A)ccount$/});
 
-        msg = new builder.Message(session)
-            .attachments([
-                new builder.ThumbnailCard(session)
-                    .title("Thumbnail Card")
-                    .subtitle("Pike Place Market is a public market overlooking the Elliott Bay waterfront in Seattle, Washington, United States.")
-                    .images([
-                        builder.CardImage.create(session, "https://upload.wikimedia.org/wikipedia/en/thumb/2/2a/PikePlaceMarket.jpg/320px-PikePlaceMarket.jpg")
-                    ])
-                    .tap(builder.CardAction.openUrl(session, "https://en.wikipedia.org/wiki/Pike_Place_Market"))
-            ]);
-        session.endDialog(msg);
-    }
-]);
-
-bot.dialog('/list', [
+bot.dialog('cancelOrders', [
     function (session) {
-        session.send("You can send the user a list of cards as multiple attachments in a single message...");
-
-        var msg = new builder.Message(session)
-            .attachments([
-                new builder.HeroCard(session)
-                    .title("Space Needle")
-                    .subtitle("The Space Needle is an observation tower in Seattle, Washington, a landmark of the Pacific Northwest, and an icon of Seattle.")
-                    .images([
-                        builder.CardImage.create(session, "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Seattlenighttimequeenanne.jpg/320px-Seattlenighttimequeenanne.jpg")
-                    ]),
-                new builder.HeroCard(session)
-                    .title("Pikes Place Market")
-                    .subtitle("Pike Place Market is a public market overlooking the Elliott Bay waterfront in Seattle, Washington, United States.")
-                    .images([
-                        builder.CardImage.create(session, "https://upload.wikimedia.org/wikipedia/en/thumb/2/2a/PikePlaceMarket.jpg/320px-PikePlaceMarket.jpg")
-                    ])
-            ]);
-        session.endDialog(msg);
-    }
-]);
-
-bot.dialog('/carousel', [
-    function (session) {
-        session.send("You can pass a custom message to Prompts.choice() that will present the user with a carousel of cards to select from. Each card can even support multiple actions.");
-        
-        // Ask the user to select an item from a carousel.
-        var msg = new builder.Message(session)
-            .attachmentLayout(builder.AttachmentLayout.carousel)
-            .attachments([
-                new builder.HeroCard(session)
-                    .title("Space Needle")
-                    .subtitle("The Space Needle is an observation tower in Seattle, Washington, a landmark of the Pacific Northwest, and an icon of Seattle.")
-                    .images([
-                        builder.CardImage.create(session, "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Seattlenighttimequeenanne.jpg/320px-Seattlenighttimequeenanne.jpg")
-                            .tap(builder.CardAction.showImage(session, "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Seattlenighttimequeenanne.jpg/800px-Seattlenighttimequeenanne.jpg")),
-                    ])
-                    .buttons([
-                        builder.CardAction.openUrl(session, "https://en.wikipedia.org/wiki/Space_Needle", "Wikipedia"),
-                        builder.CardAction.imBack(session, "select:100", "Select")
-                    ]),
-                new builder.HeroCard(session)
-                    .title("Pikes Place Market")
-                    .subtitle("Pike Place Market is a public market overlooking the Elliott Bay waterfront in Seattle, Washington, United States.")
-                    .images([
-                        builder.CardImage.create(session, "https://upload.wikimedia.org/wikipedia/en/thumb/2/2a/PikePlaceMarket.jpg/320px-PikePlaceMarket.jpg")
-                            .tap(builder.CardAction.showImage(session, "https://upload.wikimedia.org/wikipedia/en/thumb/2/2a/PikePlaceMarket.jpg/800px-PikePlaceMarket.jpg")),
-                    ])
-                    .buttons([
-                        builder.CardAction.openUrl(session, "https://en.wikipedia.org/wiki/Pike_Place_Market", "Wikipedia"),
-                        builder.CardAction.imBack(session, "select:101", "Select")
-                    ]),
-                new builder.HeroCard(session)
-                    .title("EMP Museum")
-                    .subtitle("EMP Musem is a leading-edge nonprofit museum, dedicated to the ideas and risk-taking that fuel contemporary popular culture.")
-                    .images([
-                        builder.CardImage.create(session, "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Night_Exterior_EMP.jpg/320px-Night_Exterior_EMP.jpg")
-                            .tap(builder.CardAction.showImage(session, "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Night_Exterior_EMP.jpg/800px-Night_Exterior_EMP.jpg"))
-                    ])
-                    .buttons([
-                        builder.CardAction.openUrl(session, "https://en.wikipedia.org/wiki/EMP_Museum", "Wikipedia"),
-                        builder.CardAction.imBack(session, "select:102", "Select")
-                    ])
-            ]);
-        builder.Prompts.choice(session, msg, "select:100|select:101|select:102");
-    },
+		builder.Prompts.confirm(session, 'Would you like to cancel any orders?');
+	},
     function (session, results) {
-        var action, item;
-        var kvPair = results.response.entity.split(':');
-        switch (kvPair[0]) {
-            case 'select':
-                action = 'selected';
-                break;
-        }
-        switch (kvPair[1]) {
-            case '100':
-                item = "the Space Needle";
-                break;
-            case '101':
-                item = "Pikes Place Market";
-                break;
-            case '102':
-                item = "the EMP Museum";
-                break;
-        }
-        session.endDialog('You %s "%s"', action, item);
-    }    
-]);
+		if (results.response) {
+			builder.Prompts.number(session, 'Which order# would you like to cancel?');
+			}
+		else {	
+			session.endConversation();
+			session.beginDialog('/start')	
+		}
+	},
+	function(session, results) {
+		if (results.response < 1 || results.response > session.userData.openOrders.length + 1)
+			session.send('Order number is not valid.')
+		else {
+			// cancel this order
+			var vol = session.userData.openOrders[results.response - 1].volume
+			var cur = session.userData.openOrders[results.response - 1].currency
+			var amount = session.userData.openOrders[results.response - 1].amount
+			// update the balance on order
+			if (session.userData.openOrders[results.response - 1].trade == 'B') 
+				// for buy order update USD balance
+				db.collection('balances').update({userId:  session.message.address.user.id, currency: 'USD'}, {$inc: {balanceOrders: -amount}});
+			else
+				// for sell orders update the currency balance
+				db.collection('balances').update({userId:  session.message.address.user.id, currency: cur}, {$inc: {balanceOrders: -vol}});
+			
+			// delete the order from the table
+			var ObjectId = require('mongodb').ObjectId;
+			db.collection('orders').deleteOne( {"_id": ObjectId(session.userData.openOrders[results.response - 1]._id)});
+			session.send('Order #'+results.response+' has been cancelled.');	
+		}
+		session.endConversation();
+		session.beginDialog('/start')
+    } 
+	
+])
 
-bot.dialog('/receipt', [
+function checkBalance(session) {
+	// find the balance for this user
+	// if user wants to buy he needs to have balance in USD, if he wants to sell he needs to have balance in the currency he wants to sell
+	var currency = (session.userData.trade == 'B' ? 'USD' : session.userData.currency) 
+	db.collection('balances').findOne({userId: session.message.user.id, currency: currency}, function(err, user) {
+		if (err) console.log(err)
+		if (user) {
+			session.userData.balance = user.balance - user.balanceOrders
+			if (currency == 'USD')
+				var msg = 'Your balance is: $'+user.balance.toFixed(2)+'. Balance on order is: $'+user.balanceOrders.toFixed(2)+' Available to spend: $'+ session.userData.balance.toFixed(2)
+			else
+				var msg = 'Your balance is: '+user.balance+currency+'. Balance on order is: '+user.balanceOrders+currency+' Available to spend: '+ session.userData.balance+currency
+			session.send(msg)
+			// we have enough balance lets continue
+			var pair = session.userData.currency + '_USD'
+			Exchanges.kraken.ticker(pair)
+				.then(function (text) {
+					console.log(text)
+					for (var i in text) {
+						session.userData.price = (session.userData.trade == 'B' ? text[i].ask : text[i].bid)
+					}
+					session.send('Price is currently: '+text[i].ask + ' USD')
+					session.beginDialog('getPrice');
+				})
+				.catch(function(reason) {
+					session.send('The currency: '+session.userData.currency+' does not exist. At the moment we only support currencies traded on Kraken. Enter 3 letter currency code such as BTC, ETH, LTC')
+					session.endConversation()
+					session.beginDialog('/start')
+				});
+		}
+		else {
+			// no balance found. check if this is to buy, we give every user 10k of free USD
+			if (currency == 'USD') {
+				// give a new user a balnce of $10,000
+				db.collection('balances').insertOne({userId: session.message.address.user.id,
+					currency: currency,
+					balance: 10000,
+					balanceOrders: 0,
+					})	
+				session.send('As a new user you have been given a balance of: 100,000 USD')
+				session.userData.balance = 100000
+				var pair = session.userData.currency + '_USD'
+				Exchanges.kraken.ticker(pair)
+					.then(function (text) {
+						console.log(text)
+						for (var i in text) {
+							session.userData.price = (session.userData.trade == 'B' ? text[i].ask : text[i].bid)
+						}
+						session.send('Price is currently: '+text[i].ask + ' USD')
+						session.beginDialog('getPrice');
+					})
+					.catch(function(reason) {
+						session.send('The currency: '+session.userData.currency+' does not exist. At the moment we only support currencies traded on Kraken. Enter 3 letter currency code such as BTC, ETH, LTC')
+						session.endConversation()
+						session.beginDialog('/start')
+				});
+			} else {
+				session.send('You dont have enough balance available.')
+				session.endConversation()
+				session.beginDialog('/start')
+			}
+		}
+	})
+	
+}
+
+bot.dialog('getPrice', [
+    function (session,args) {	
+		var msg = "At what price would you like to "+(session.userData.trade == 'B' ? 'buy' : 'sell') +  "? Enter 0 for marketorder."
+		if (args && args.reprompt) {
+			if (args.reprompt == "neg") var msg = 'Price can not be negative. ' + msg
+			if (args.reprompt == "bal") var msg = 'Total order value exceeds your balance. ' + msg
+		}
+		builder.Prompts.number(session, msg);
+	},
+	function(session, results) {
+		if (results.response < 0) {
+			session.replaceDialog('getPrice', { reprompt: "neg" });
+		} else {
+			if (results.response == 0) 
+				session.userData.orderType = 'M'
+			else {
+				session.userData.orderType = 'L'
+				session.userData.price = results.response
+			}
+			session.replaceDialog('getvolume')
+			//builder.Prompts.number(session, "What volume?");
+			//session.endDialogWithResult({ response: results.response });
+		}
+	}	
+])
+
+bot.dialog('getvolume', [
+    function (session, args) {	
+		if (args && args.reprompt) {
+			if (args.reprompt == "neg") session.send('Amount has to be positive.')
+			if (args.reprompt == "bal") session.send('Amount exceeds your current balance.')
+		}
+		var msg = "What amount would you like to "+(session.userData.trade == 'B' ? 'buy' : 'sell') +"?"
+		builder.Prompts.number(session, msg);
+	},
+	function(session, results) {
+		session.userData.volume = results.response;
+		if (results.response <= 0) 
+			session.replaceDialog('getvolume', { reprompt: "neg" })
+		else {	
+			// check if enough balance available
+			if (session.userData.trade == 'B') {
+				// we are buying we need to do price * amount to calculate balance needed
+				var totalOrderAmount = session.userData.volume * session.userData.price
+				if (totalOrderAmount > session.userData.balance)
+					session.replaceDialog('getPrice', { reprompt: "bal" });
+				else	
+					session.endDialogWithResult({ response: results.response })
+			} else {
+				// we are selling, we just need the amount available that we want to sell
+				if (session.userData.volume > session.userData.balance)
+					session.replaceDialog('getvolume', { reprompt: "bal" })
+				else
+					session.endDialogWithResult({ response: results.response })
+			}
+		}
+	}	
+])
+
+bot.dialog('/trade', [
     function (session) {
-        session.send("You can send a receipts for facebook using Bot Builders ReceiptCard...");
-        var msg = new builder.Message(session)
-            .attachments([
-                new builder.ReceiptCard(session)
-                    .title("Recipient's Name")
-                    .items([
-                        builder.ReceiptItem.create(session, "$22.00", "EMP Museum").image(builder.CardImage.create(session, "https://upload.wikimedia.org/wikipedia/commons/a/a0/Night_Exterior_EMP.jpg")),
-                        builder.ReceiptItem.create(session, "$22.00", "Space Needle").image(builder.CardImage.create(session, "https://upload.wikimedia.org/wikipedia/commons/7/7c/Seattlenighttimequeenanne.jpg"))
-                    ])
-                    .facts([
-                        builder.Fact.create(session, "1234567898", "Order Number"),
-                        builder.Fact.create(session, "VISA 4076", "Payment Method")
-                    ])
-                    .tax("$4.40")
-                    .total("$48.40")
-            ]);
-        session.send(msg);
+		var msg = "What crypto would you like to " + (session.userData.trade == 'B' ? 'buy' : 'sell')+'?'
+		builder.Prompts.text(session, msg);
+	},
+	function(session, results) {
+		session.userData.currency = results.response.toUpperCase();
+		//if buying need balance in USD (base currency) if selling need balance of selling currency
+		checkBalance(session)
+    }, 	
+	function(session, results) {
+		//var buyprice = session.userData.price ? session.userData.price : session.userData.marketprice
+		var confirm = 'Please confirm that you want to ' + (session.userData.trade == 'B' ? 'BUY ' : 'SELL ')
+		confirm = confirm +session.userData.volume+' '+session.userData.currency+ ' at $'+session.userData.price +' Total: $'+ session.userData.volume * session.userData.price
+		builder.Prompts.confirm(session, confirm);
+    },	
+    function (session, results) {
+		if (results.response) {
+			var msg = 'Thank you. Your order has been placed'
+			processOrder(session)
+			}
+		else var msg = 'OK, Your order has been cancelled'
+        session.endConversation(msg);
+		session.beginDialog('/start')
+	}			
+])
 
-        session.send("Or using facebooks native attachment schema...");
-        msg = new builder.Message(session)
-            .sourceEvent({
-                facebook: {
-                    attachment: {
-                        type: "template",
-                        payload: {
-                            template_type: "receipt",
-                            recipient_name: "Stephane Crozatier",
-                            order_number: "12345678902",
-                            currency: "USD",
-                            payment_method: "Visa 2345",        
-                            order_url: "http://petersapparel.parseapp.com/order?order_id=123456",
-                            timestamp: "1428444852", 
-                            elements: [
-                                {
-                                    title: "Classic White T-Shirt",
-                                    subtitle: "100% Soft and Luxurious Cotton",
-                                    quantity: 2,
-                                    price: 50,
-                                    currency: "USD",
-                                    image_url: "http://petersapparel.parseapp.com/img/whiteshirt.png"
-                                },
-                                {
-                                    title: "Classic Gray T-Shirt",
-                                    subtitle: "100% Soft and Luxurious Cotton",
-                                    quantity: 1,
-                                    price: 25,
-                                    currency: "USD",
-                                    image_url: "http://petersapparel.parseapp.com/img/grayshirt.png"
-                                }
-                            ],
-                            address: {
-                                street_1: "1 Hacker Way",
-                                street_2: "",
-                                city: "Menlo Park",
-                                postal_code: "94025",
-                                state: "CA",
-                                country: "US"
-                            },
-                            summary: {
-                                subtotal: 75.00,
-                                shipping_cost: 4.95,
-                                total_tax: 6.19,
-                                total_cost: 56.14
-                            },
-                            adjustments: [
-                                { name: "New Customer Discount", amount: 20 },
-                                { name: "$10 Off Coupon", amount: 10 }
-                            ]
-                        }
-                    }
-                }
-            });
-        session.endDialog(msg);
-    }
-]);
+function processOrder(session) {
 
-bot.dialog('/actions', [
-    function (session) { 
-        session.send("Bots can register global actions, like the 'help' & 'goodbye' actions, that can respond to user input at any time. You can even bind actions to buttons on a card.");
+	var amount = session.userData.volume * session.userData.price
+	var vol = session.userData.volume *1
 
-        var msg = new builder.Message(session)
-            .attachments([
-                new builder.HeroCard(session)
-                    .title("Space Needle")
-                    .subtitle("The Space Needle is an observation tower in Seattle, Washington, a landmark of the Pacific Northwest, and an icon of Seattle.")
-                    .images([
-                        builder.CardImage.create(session, "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Seattlenighttimequeenanne.jpg/320px-Seattlenighttimequeenanne.jpg")
-                    ])
-                    .buttons([
-                        builder.CardAction.dialogAction(session, "weather", "Seattle, WA", "Current Weather")
-                    ])
-            ]);
-        session.send(msg);
+	
+	// process marketorders directly
+	if (session.userData.orderType == 'M') {
+		console.log('process market order')
+		db.collection('trades').insertOne({userId: session.message.address.user.id, 
+				userName: session.message.address.user.name, 
+				date:(new Date()).getTime(),
+				currency: session.userData.currency,
+				price: session.userData.price,
+				volume: vol,
+				amount: amount,
+				trade: session.userData.trade,
+				ordertype: session.userData.orderType
+				})	
+		//update balances
+		if (session.userData.trade == 'B') {
+			// buying reduce the base currency. Later we can use different base currency than USD
+			db.collection('balances').updateOne({userId:  session.message.address.user.id, currency: "USD"}, {$inc: {balance: -amount}});
+			db.collection('balances').update({userId:  session.message.address.user.id, currency: session.userData.currency}, {$inc: {balance: vol, balanceOrders:0}}, { upsert: true });		
+		} else {
+			// whilst selling increase the base currency
+			db.collection('balances').updateOne({userId:  session.message.address.user.id, currency: "USD"}, {$inc: {balance: amount}});
+			db.collection('balances').update({userId:  session.message.address.user.id, currency: session.userData.currency}, {$inc: {balance: -vol, balanceOrders:0}}, { upsert: true });				
+		}
 
-        session.endDialog("The 'Current Weather' button on the card above can be pressed at any time regardless of where the user is in the conversation with the bot. The bot can even show the weather after the conversation has ended.");
-    }
-]);
+	} else {
+		// process limit orders later, just enter them in orders table.
+		console.log('process limit order')
+		db.collection('orders').insertOne({userId: session.message.address.user.id, 
+			userName: session.message.address.user.name, 
+            date:(new Date()).getTime(),
+			currency: session.userData.currency,
+			price: session.userData.price,
+			volume: vol,
+            amount: amount,
+			trade: session.userData.trade,
+			ordertype: session.userData.orderType
+			})
+		// update balanceonorders
+		if (session.userData.trade == 'B') 
+			db.collection('balances').updateOne({userId:  session.message.address.user.id, currency: "USD"}, {$inc: {balanceOrders: amount}});
+		else	
+			db.collection('balances').updateOne({userId:  session.message.address.user.id, currency: session.userData.currency}, {$inc: {balanceOrders: vol}});			
+	}
+	
+}
 
-// Create a dialog and bind it to a global action
-bot.dialog('/weather', [
-    function (session, args) {
-        session.endDialog("The weather in %s is 71 degrees and raining.", args.data);
-    }
-]);
-bot.beginDialogAction('weather', '/weather');   // <-- no 'matches' option means this can only be triggered by a button.
+bot.dialog('/db', [
+    function (session) {
+		builder.Prompts.text(session, "Database entry");
+		/*
+		db.collection('users').findOne({userId: session.message.user.id}, function(err, user) {
+			if (err) console.log(err)
+			console.log('User:%j', user)
+		})
+		db.collection('balances').find({userId: session.message.user.id}).toArray(function(err, balances) {
+			for (i in balances) {
+				console.log(balances[i].currency + ':'+balances[i].balance)
+			}
+		})
+		//update
+		//db.collection('balances').updateOne({userId: session.message.user.id, currency: "USDt"}, {$set: {balance: 6000}});
+		
+		//insert
+		db.collection('balances').insertOne({userId: session.message.user.id, currency: "USD", balance: 10000})
+		*/
+	},
+    function (session, results) {
+        session.endConversation("You chose '%s'", results.response ? 'yes' : 'no');
+		session.beginDialog('/start')
+	}			
+]).triggerAction({matches: /^(D|d)b$/});
+

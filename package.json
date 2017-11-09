@@ -5,7 +5,8 @@
   "main": "app.js",
   "dependencies": {
     "restify": "^4.3.0",
-    "botbuilder": "^3.6.0"
+    "botbuilder": "^3.6.0",
+	"mongodb": "", 
   },
   "devDependencies": {},
   "scripts": {
