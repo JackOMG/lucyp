@@ -226,7 +226,7 @@ bot.use({
 				userName: session.message.address.user.name, 
 				date:(new Date()).getTime(),
 				address: session.message.address,
-				referral: event.sourceEvent.referral
+				referral: event.sourceEvent.referral.ref
 			})
 		}
 		next();
