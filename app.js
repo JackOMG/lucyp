@@ -215,13 +215,20 @@ bot.use({
 	    var event = session.message;
 		// check for referral
 		if(event.sourceEvent.postback && event.sourceEvent.postback.referral)	{
-			session.userData.referral = event.sourceEvent.postback.referral.ref;
-			console.log('referral %j', session.userData.referral)
+			db.collection('referrals').insert({userId: session.message.address.user.id, 
+				userName: session.message.address.user.name, 
+				date:(new Date()).getTime(),
+				address: session.message.address,
+				referral: event.sourceEvent.postback.referral.ref
+			})
 		} else if (event.sourceEvent.referral) {
-			session.userData.referral = event.sourceEvent.referral;
-			console.log('referral %j', session.userData.referral)
+			db.collection('referrals').insert({userId: session.message.address.user.id, 
+				userName: session.message.address.user.name, 
+				date:(new Date()).getTime(),
+				address: session.message.address,
+				referral: event.sourceEvent.referral
+			})
 		}
-		session.save();
 		next();
        }
 });
