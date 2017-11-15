@@ -91,14 +91,20 @@ bot.dialog('/ask', [
 	},
 	function (session, results) {
 		session.userData.question = results.response
+		builder.Prompts.text(session, "Ok. Can you help me with some keywords so I can find the right expert to ask?");
+	},
+	function (session, results) {
+		session.userData.keywords = results.response
 		// add to the questions table
 		db.collection('questions').insert({userId: session.message.address.user.id, 
 			userName: session.message.address.user.name, 
 			date:(new Date()).getTime(),
 			address: session.message.address,
-			question: results.response
+			question: session.userData.question,
+			keywords: results.response
 		})
-		session.endDialog("That is an interesting question, I dont know the answer yet but I will try to find out for you.");
+		var msg = "Ok I will look for an expert in: " + results.response +' and ask him the following question: '+ session.userData.question
+		session.endDialog(msg);
 	}	
 ]).triggerAction({matches: /^(A|a)sk$/});
 
