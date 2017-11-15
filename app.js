@@ -209,3 +209,20 @@ bot.dialog('quizContribute', [
 	}	
 ])
 
+// Middleware for logging
+bot.use({
+	botbuilder: function (session, next) {
+	    var event = session.message;
+		// check for referral
+		if(event.sourceEvent.postback && event.sourceEvent.postback.referral)	{
+			session.userData.referral = event.sourceEvent.postback.referral.ref;
+			console.log('referral %j', session.userData.referral)
+		} else if (event.sourceEvent.referral) {
+			session.userData.referral = event.sourceEvent.referral;
+			console.log('referral %j', session.userData.referral)
+		}
+		session.save();
+		next();
+       }
+});
+
