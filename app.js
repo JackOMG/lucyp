@@ -126,13 +126,30 @@ bot.dialog('/account', [
 			if (err) console.log(err)
 			if (user) {
 				session.send('You have answered '+user.questions+' questions. Of these you had '+user.correct+' correct and '+user.wrong+' wrong.');
+				// check if user has areas of expertise filled in
+				if (user.expertise) {
+					session.send('Your areas of expertise are: ' + user.expertise)
+				} else {
+					session.beginDialog('userExpertise')
+				}
+				
 			} else {
 				session.send('I could not find your account info')
 			}
-			session.endDialog()
 		})
 	}	
 ]).triggerAction({matches: /^(A|a)ccount$/});
+
+bot.dialog('userExpertise', [
+    function (session) {
+		builder.Prompts.text(session, "What are you areas of expertise? Tell me in short words seperated by commas. For example: Payments, KYC, AML");
+	},
+	function (session, results) {
+		session.endDialog("Great! If I get some questions on: "+results.response+" I will surely contact you")
+		db.collection('users').update({userId: session.message.address.user.id}, 
+		{$set: {expertise: results.response}})
+	}	
+])
 
 bot.dialog('playquiz', [
     function (session) {
