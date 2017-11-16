@@ -128,7 +128,7 @@ bot.dialog('/account', [
 				session.send('You have answered '+user.questions+' questions. Of these you had '+user.correct+' correct and '+user.wrong+' wrong.');
 				// check if user has areas of expertise filled in
 				if (user.expertise) {
-					session.send('Your areas of expertise are: ' + user.expertise)
+					session.endDialog('Your areas of expertise are: ' + user.expertise)
 				} else {
 					session.beginDialog('userExpertise')
 				}
