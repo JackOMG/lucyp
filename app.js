@@ -125,7 +125,10 @@ bot.dialog('/account', [
 		db.collection('users').findOne({userId: session.message.user.id}, function(err, user) {
 			if (err) console.log(err)
 			if (user) {
-				session.send('You have answered '+user.questions+' questions. Of these you had '+user.correct+' correct and '+user.wrong+' wrong.');
+				if (user.questions)
+					session.send('You have answered '+user.questions+' questions. Of these you had '+user.correct+' correct and '+user.wrong+' wrong.');
+				else 
+					session.send('You have not yet participated in a quiz')
 				// check if user has areas of expertise filled in
 				if (user.expertise) {
 					session.endDialog('Your areas of expertise are: ' + user.expertise)
