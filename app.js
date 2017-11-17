@@ -234,7 +234,10 @@ bot.use({
 	botbuilder: function (session, next) {
 		//check if user is muted in MuteUser table
 		db.collection('MuteUser').findOne({userId: session.message.user.id}, function(err, user) {
-			if (!user)
+			if (user) {
+				// this user is muted
+				console.log('User %j muted', user)
+			} else
 				next()
 		})
 		
