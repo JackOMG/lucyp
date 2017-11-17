@@ -232,8 +232,14 @@ bot.dialog('quizContribute', [
 // Middleware for logging
 bot.use({
 	botbuilder: function (session, next) {
-	    var event = session.message;
+		//check if user is muted in MuteUser table
+		db.collection('MuteUser').findOne({userId: session.message.user.id}, function(err, user) {
+			if (!user)
+				next()
+		})
+		
 		// check for referral
+	    var event = session.message;
 		if(event.sourceEvent.postback && event.sourceEvent.postback.referral)	{
 			db.collection('referrals').insert({userId: session.message.address.user.id, 
 				userName: session.message.address.user.name, 
@@ -249,7 +255,6 @@ bot.use({
 				referral: event.sourceEvent.referral.ref
 			})
 		}
-		next();
-       }
+    }
 });
 
